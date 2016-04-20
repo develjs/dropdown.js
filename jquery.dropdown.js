@@ -20,6 +20,8 @@
       "autoinit": false,
       "callback": false,
       "onSelected": false,
+      "absolutePos": false, // positioning relative to body
+      "align": "left",	// align relative to item
       "dynamicOptLabel": "Add a new option..."
     },
     init: function(options) {
@@ -57,10 +59,14 @@
 
         // Create the UL that will be used as dropdown and cache it AS $ul
         var $ul = $("<ul></ul>");
+        $ul.addClass("dropdownjs-ul");
         $ul.data("select", $select);
 
         // Append it to the dropdown
-        $dropdown.append($ul);
+        if (options.absolutePos)
+          $("body").append($ul);
+        else
+          $dropdown.append($ul);
 
         // Transfer the placeholder attribute
         $input.attr("placeholder", $select.attr("placeholder"));
@@ -111,7 +117,10 @@
         $input.addClass($select[0].className);
 
         // Hide the old and ugly select
-        $select.hide().attr("data-dropdownjs", true);
+        $select.hide()
+            .attr("data-dropdownjs", true)
+            .data("dropdownjs-ul", $ul);
+
 
         // Bring to life our awesome dropdownjs
         $select.after($dropdown);
@@ -134,6 +143,7 @@
         $ul.on("keydown", "li:not(.dropdownjs-add)", function(e) {
           if (e.which === 27) {
             $(".dropdownjs > ul > li").attr("tabindex", -1);
+            $ul.removeClass("focus");
             return $input.removeClass("focus").blur();
           }
           if (e.which === 32 && !$(e.target).is("input")) {
@@ -199,30 +209,45 @@
           if ($select.is(":disabled")) {
             return;
           }
-          $(".dropdownjs > ul > li").attr("tabindex", -1);
+          $(".dropdownjs-ul > li").attr("tabindex", -1);
           $(".dropdownjs > input").not($(this)).removeClass("focus").blur();
 
-          $(".dropdownjs > ul > li").not(".dropdownjs-add").attr("tabindex", 0);
+          $(".dropdownjs-ul > li").not(".dropdownjs-add").attr("tabindex", 0);
 
-          // Set height of the dropdown
+          // Set size/pos of the dropdown
           var coords = {
             top: $(this).offset().top - $(document).scrollTop(),
             left: $(this).offset().left - $(document).scrollLeft(),
-            bottom: $(window).height() - ($(this).offset().top - $(document).scrollTop()),
-            right: $(window).width() - ($(this).offset().left - $(document).scrollLeft())
+            bottom: $(window).height() - ($(this).offset().top - $(document).scrollTop()) - $(this).outerHeight(), // bottom from bottom
+            right: $(window).width() - ($(this).offset().left - $(document).scrollLeft()) - $(this).outerWidth() // right from right
           };
 
+
+          // horisontal position
+          if (options.absolutePos)
+            $ul.css(options.align, coords[options.align]);
+
+
+          // vertical position/size
           var height = coords.bottom;
 
           // Decide if place the dropdown below or above the input
-          if (height < 200 && coords.top > coords.bottom) {
+          if (height < 200 && coords.top > height) {
             height = coords.top;
-            $ul.attr("placement", "top-left");
+            $ul.attr("placement", "top-"+options.align);
           } else {
-            $ul.attr("placement", "bottom-left");
+            $ul.attr("placement", "bottom-"+options.align);
           }
 
-          $(this).next("ul").css("max-height", height - 20);
+          // preset position for absolute positioning
+          if (options.absolutePos)
+            $ul.css({
+              "top":       /top/.test($ul.attr("placement"))? "auto": coords.top    + $input.outerHeight(),
+              "bottom": /bottom/.test($ul.attr("placement"))? "auto": coords.bottom + $input.outerHeight()
+            });
+
+          $ul.css("max-height", height - 20);
+          $ul.addClass("focus");
           $(this).addClass("focus");
         });
         // Close every dropdown on click outside
@@ -235,8 +260,9 @@
           if ($(e.target).parents(".dropdownjs-add").length || $(e.target).is(".dropdownjs-add")) return;
 
           // Close opened dropdowns
-          $(".dropdownjs > ul > li").attr("tabindex", -1);
+          $(".dropdownjs-ul > li").attr("tabindex", -1);
           $input.removeClass("focus");
+          $ul.removeClass("focus");
         });
       }
 
@@ -268,12 +294,13 @@
 
       // Get dropdown's elements
       var $select = $dropdown.data("select"),
-          $input  = $dropdown.find("input.fakeinput");
+          $input  = $dropdown.find("input.fakeinput"),
+          $ul = $($select.data("dropdownjs-ul"));
       // Is it a multi select?
       var multi = $select.attr("multiple");
 
       // Cache the dropdown options
-      var selectOptions = $dropdown.find("li");
+      var selectOptions = $ul.find("li");
 
       // Behavior for multiple select
       if (multi) {
